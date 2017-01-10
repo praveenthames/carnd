@@ -23,6 +23,7 @@ from keras.utils import np_utils
 from keras.models import model_from_json
 from keras.layers.convolutional import Convolution2D
 from keras.layers.advanced_activations import ELU
+from keras.wrappers.scikit_learn import KerasRegressor
 
 ifile  = open('/Users/praveen.subramanian/data/carnd/p3/driving_log.csv', "rt")
 reader = csv.reader(ifile)
@@ -36,27 +37,34 @@ for row in reader:
 
 ifile.close()
 
+
 print("No. of center images = ",len(center_image))
 print("No. of steering angles = ",len(steering_angle))
 
 num_images = len(center_image)
+image_rows = 160
+image_columns = 320
+image_channels = 3
 
-grey = np.zeros((num_images,160,320,3))
+# center_image = center_image.reshape(1, image_rows, image_columns, image_channels)
+
+grey = np.zeros((num_images,image_rows,image_columns,image_channels))
 #grey = np.zeros((num_images,51200))
 for i in range(num_images):
     im1=cv2.imread(center_image[i])
-    #grey[i] = im1
+    im1 = im1.reshape(1, image_rows, image_columns, image_channels)
+    grey[i] = im1
     steering_angle[i] = round(float(steering_angle[i]),2)
     #grey[i] = cv2.cvtColor( im1, cv2.COLOR_RGB2GRAY).flatten()
     
-steering_classes = list(set(steering_angle))
-for i in range(len(steering_angle)):
-    steering_angle[i] = steering_classes.index(steering_angle[i])
-    
-num_classes = len(set(steering_classes))
+# steering_classes = list(set(steering_angle))
+# for i in range(len(steering_angle)):
+#     steering_angle[i] = steering_classes.index(steering_angle[i])
+#     
+# num_classes = len(set(steering_classes))
     
 print("The shape after grey scale conversion and flattening = ",grey.shape)
-print("The number of distinct classes = ",num_classes)
+# print("The number of distinct classes = ",num_classes)
 
 X_train, X_val, y_train, y_val = train_test_split(grey,steering_angle , test_size=0.33, random_state=0)
 
@@ -77,12 +85,10 @@ X_val = X_val.astype('float32')
 #X_val /= 255
 
 # convert class vectors to binary class matrices
-y_train = np_utils.to_categorical(y_train, num_classes)
-y_val = np_utils.to_categorical(y_val, num_classes)
+# y_train = np_utils.to_categorical(y_train, num_classes)
+# y_val = np_utils.to_categorical(y_val, num_classes)
 
-image_rows = 160
-image_columns = 320
-image_channels = 3
+
 
 input_shape = (image_rows, image_columns, image_channels)
 model = Sequential()
@@ -120,12 +126,32 @@ model.summary()
 model.compile(optimizer=adam, loss='mse')
 
 
-history = model.fit(X_train, y_train,
-                    batch_size=batch_size, nb_epoch=nb_epoch,
-                    verbose=1, validation_data=(X_val, y_val))
+def batchgen(features,output):
+    num_features = len(features)
+    for i in num_features:
+        yield (features[i],output[i])
+# history = model.fit(X_train, y_train,
+#                     batch_size=batch_size, nb_epoch=nb_epoch,
+#                     verbose=1, validation_data=(X_val, y_val))
+# score = model.evaluate(X_val, y_val, verbose=0)
+# print('Test score:', score[0])
+# print('Test accuracy:', score[1])
+history = model.fit_generator(batchgen(X_train, y_train), samples_per_epoch = 20, nb_epoch = nb_epoch,
+                    verbose=1, max_q_size = 10,
+                     pickle_safe=False)
 score = model.evaluate(X_val, y_val, verbose=0)
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
+
+# fix random seed for reproducibility
+# seed = 7
+# np.random.seed(seed)
+# # evaluate model with standardized dataset
+# estimator = KerasRegressor(build_fn=baseline_model, nb_epoch=100, batch_size=5, verbose=0)
+# 
+# kfold = KFold(n_splits=10, random_state=seed)
+# results = cross_val_score(estimator, X_train, y_train, cv=kfold)
+# print("Results: %.2f (%.2f) MSE" % (results.mean(), results.std()))
 
 model_json = model.to_json()
 with open('model.json', 'w') as f:
