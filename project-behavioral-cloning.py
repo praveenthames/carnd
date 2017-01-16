@@ -27,14 +27,18 @@ from keras.layers.advanced_activations import ELU
 from keras.wrappers.scikit_learn import KerasRegressor
 
 ifile  = open('/Users/praveen.subramanian/data/carnd/p3/driving_log.csv', "rt")
+# ifile  = open('driving_log.csv', "rt")
 reader = csv.reader(ifile)
 
 center_image = []
 steering_angle = []
 
+i = 0
 for row in reader:
-    center_image.append(row[0])
-    steering_angle.append(row[3])
+    if i > 0 :
+        center_image.append(row[0])
+        steering_angle.append(row[3])
+    i = i+1
 
 ifile.close()
 
@@ -47,7 +51,6 @@ image_rows = 160
 image_columns = 320
 image_channels = 3
 
-# center_image = center_image.reshape(1, image_rows, image_columns, image_channels)
 
 grey = np.zeros((num_images,image_rows,image_columns,image_channels))
 #grey = np.zeros((num_images,51200))
